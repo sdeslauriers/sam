@@ -1,0 +1,31 @@
+#!/usr/bin/env python
+
+import argparse
+
+import streamlines as sl
+
+from sam import clean_bundle
+
+
+def main():
+
+    parser = argparse.ArgumentParser(
+        description='Cleans a bundle of streamlines by removing \'outliers\'.'
+    )
+    parser.add_argument(
+        'bundle', metavar='bundle',
+        help='FILE The file that contains the streamline bundle to clean.')
+    parser.add_argument(
+        'output', metavar='output_bundle',
+        help='FILE The file where the cleaned bundle will be saved.')
+
+    args = parser.parse_args()
+
+    # Load the streamlines.
+    bundle = sl.io.load(args.bundle)
+    cleaned_bundle = clean_bundle(bundle)
+    sl.io.save(cleaned_bundle, args.output)
+
+
+if __name__ == '__main__':
+    main()
