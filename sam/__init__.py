@@ -1,5 +1,4 @@
 import numpy as np
-
 from streamlines import Streamlines
 
 
@@ -26,17 +25,16 @@ def clean_bundle(streamlines: Streamlines) -> Streamlines:
     to_keep = np.abs(lengths - np.mean(lengths)) < 2 * np.std(lengths)
     streamlines = streamlines[to_keep]
 
-    # Remove streamlines that do not end near the others.
-    starts = [s[0] for s in streamlines]
-    to_keep = np.all(
-        np.abs(starts - np.mean(starts, 0)) < 3 * np.std(starts, 0),
-        1)
-    streamlines = streamlines[to_keep]
+    # Remove streamlines whose points are far from the distribution of the
+    # rest of the bundle.
+    streamlines.resample(nb_points=100)
+    to_keep = np.ones((len(streamlines),))
+    for i in range(3):
+        x = [s.points[:, i] for s in streamlines]
+        to_keep = np.logical_and(
+            np.all(np.abs(x - np.mean(x, 0)) < 2.5 * np.std(x, 0), 1),
+            to_keep)
 
-    ends = [s[0] for s in streamlines]
-    to_keep = np.all(
-        np.abs(ends - np.mean(ends, 0)) < 3 * np.std(ends, 0),
-        1)
     streamlines = streamlines[to_keep]
 
     # Make the streamlines prettier by smoothing them.
