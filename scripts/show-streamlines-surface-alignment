@@ -1,0 +1,136 @@
+#!/usr/bin/env python
+
+import argparse
+
+import nimesh
+import streamlines as sl
+import vtk
+
+
+def view(streamlines, mesh):
+    """View streamlines and mesh in interactive window"""
+
+    # Create a new vtk renderer and rendering window.
+    renderer = vtk.vtkRenderer()
+    renderer.SetViewport(0.0, 0.0, 1.0, 1.0)
+    renderer.SetBackground(0.0, 0.0, 0.0)
+    rendering_window = vtk.vtkRenderWindow()
+    rendering_window.AddRenderer(renderer)
+
+    # Allow the user to interact with the mesh.
+    interactor = vtk.vtkRenderWindowInteractor()
+    interactor.SetRenderWindow(rendering_window)
+    interactor.SetInteractorStyle(
+        vtk.vtkInteractorStyleTrackballCamera())
+
+    # Compute the number of points.
+    nb_points = 0
+    for streamline in streamlines:
+        nb_points += len(streamline)
+
+    # The vtk points and lines that represent the lines to draw.
+    points = vtk.vtkPoints()
+    points.SetNumberOfPoints(nb_points)
+    lines = vtk.vtkCellArray()
+
+    # Copy the point and streamline data to vtk objects.
+    point_count = 0
+    for streamline in streamlines:
+        lines.InsertNextCell(len(streamline))
+        for idx, point in enumerate(streamline):
+            points.SetPoint(point_count, point[0], point[1], point[2])
+            lines.InsertCellPoint(point_count)
+            point_count += 1
+
+    poly_data = vtk.vtkPolyData()
+    poly_data.SetPoints(points)
+    poly_data.SetLines(lines)
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(poly_data)
+
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetOpacity(0.1)
+    actor.GetProperty().SetLineWidth(1)
+
+    # Add the actor to the renderer.
+    renderer.AddActor(actor)
+
+    # Transfer the meshes vertices to the vtk format.
+    points = vtk.vtkPoints()
+    for vertex in mesh.vertices:
+        points.InsertNextPoint(*vertex)
+
+    # Create the triangles of the surface.
+    triangles = vtk.vtkCellArray()
+    for triangle in mesh.triangles:
+        vtk_triangle = vtk.vtkTriangle()
+        vtk_triangle.GetPointIds().SetId(0, triangle[0])
+        vtk_triangle.GetPointIds().SetId(1, triangle[1])
+        vtk_triangle.GetPointIds().SetId(2, triangle[2])
+        triangles.InsertNextCell(vtk_triangle)
+
+    # Create the poly data, mapper, and actor.
+    polydata = vtk.vtkPolyData()
+    polydata.SetPoints(points)
+    polydata.SetPolys(triangles)
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(polydata)
+
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetOpacity(0.1)
+    actor.GetProperty().SetSpecular(0.0)
+    actor.GetProperty().SetDiffuse(0.5)
+    actor.GetProperty().SetAmbient(0.5)
+
+    # Add the actor to the renderer.
+    renderer.AddActor(actor)
+
+    # Start rendering.
+    rendering_window.Render()
+    interactor.Start()
+
+    # Cleanup when the user closes the window.
+    rendering_window.Finalize()
+    interactor.TerminateApp()
+
+
+def main():
+
+    parser = argparse.ArgumentParser(
+        description='Show streamlines and surface in a vtk viewer to verify '
+                    'alignment.'
+    )
+    parser.add_argument(
+        'streamlines', metavar='streamlines',
+        help='FILE The file that contains the streamlines to visualize.')
+    parser.add_argument(
+        'surface', metavar='surface',
+        help='FILE The file that contains the surface to visualize.'
+    )
+    parser.add_argument(
+        '--freesurfer', metavar=('HEMISPHERE', 'SURFACE'), nargs=2,
+        help='STR STR Specifies the hemisphere (lh or rh) and the surface '
+             'type (pial, white, or inflated) to view. Only useful if the '
+             'filename is a FreeSurfer directory.')
+
+    args = parser.parse_args()
+
+    # Load the streamlines and the surface..
+    bundle = sl.io.load(args.streamlines)
+    bundle.transform(bundle.affine)
+
+    if args.freesurfer:
+        surface = nimesh.from_freesurfer(args.surface, *args.freesurfer,
+                                         load_annotations=False)
+    else:
+        surface = nimesh.io.load(args.surface)
+
+    view(bundle, surface)
+
+
+if __name__ == '__main__':
+    main()

@@ -9,5 +9,5 @@ setup(
     author='Samuel Deslauriers-Gauthier',
     author_email='sam.deslauriers@gmail.com',
     description='A Python package that contains Sam\'s python tools.',
-    install_requires=['numpy', 'streamlines']
+    install_requires=['numpy', 'streamlines', 'nibabel', 'vtk']
 )
