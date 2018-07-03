@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+import argparse
+import warnings
+
+import nibabel as nib
+from nimesh import AffineTransform, CoordinateSystem, Mesh
+from nimesh.io import save
+from skimage.measure import marching_cubes_lewiner
+
+
+def main():
+
+    parser = argparse.ArgumentParser(
+        description='Converts a  NIfTI volume to a mesh using the marching '
+                    'cubes algorithm.'
+    )
+
+    parser.add_argument(
+        'volume', metavar='VOLUME',
+        help='FILE The NIfTI file that contains the volume to convert to a '
+             'mesh.')
+    parser.add_argument(
+        'mesh', metavar='MESH',
+        help='FILE The filename of the generated mesh. Must be a format '
+             'supported by nimesh.')
+    parser.add_argument(
+        '--threshold', default=None,
+        help='FLOAT The threshold to apply to the volume to convert to a '
+             'mask. If not supplied, the average value of the volume is used.')
+
+    args = parser.parse_args()
+
+    # Load the image and extract the surface using marching cubes.
+    nii = nib.load(args.volume)
+    data = nii.get_data()
+    vertices, triangles, normals, _ = marching_cubes_lewiner(data,
+                                                             args.threshold)
+
+    # Create the mesh from the extracted surface.
+    mesh = Mesh(vertices, triangles,
+                coordinate_system=CoordinateSystem.VOXEL,
+                normals=normals)
+
+    # Add the affine to world space.
+    codes = nib.aff2axcodes(nii.affine)
+
+    if codes == ('L', 'P', 'S'):
+        coordinate_system = CoordinateSystem.LPS
+    elif codes == ('R', 'A', 'S'):
+        coordinate_system = CoordinateSystem.RAS
+    else:
+        coordinate_system = CoordinateSystem.UNKNOWN
+        warnings.warn('The coordinate system could not be identified from '
+                      'the volume'' affine.')
+
+    mesh.add_transform(AffineTransform(
+        coordinate_system,
+        nii.affine))
+
+    save(args.mesh, mesh)
+
+
+if __name__ == '__main__':
+    main()
